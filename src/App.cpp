@@ -8,40 +8,17 @@ App::App(int screen_w, int screen_h)
     this->screen_w = screen_w;
     this->screen_h = screen_h;
 
+    time_counter = 0;
+
     render_colliders = false;
-    render_farmable = false;
     render_positions = false;
 
-    has_collected_bag = false;
-    has_planted_seed = false;
-    has_collected_plant = false;
-    has_sold_plant = false;
-    has_bought_seeds = false;
-
     // Load Font (https://ggbot.itch.io/kaph-font)
-    kaph_font = LoadFontEx("Kaph-Regular.ttf", 128, 0, 250);
+    // kaph_font = LoadFontEx("Kaph-Regular.ttf", 128, 0, 250);
 
     inv_rot = {0.0, 20, 20, true, -1, 1, EaseInOutCubic};
     inv_scale = {0.0, 40, 40, true, 0.95, 1, EaseInOutCubic};
     text_y_add = {0.0, 5, 5, true, 0, 10, EaseInOutCubic};
-
-    occupied_plant_area = std::vector<std::vector<flecs::entity_t>>(32, std::vector<flecs::entity_t>(32, flecs::Empty));
-
-    std::vector<std::string> plant_names({
-        "Rose",
-        "Pointy",
-        "Daisy",
-        "Marigold",
-        "Delphinium",
-        "Lavender",
-        "Primrose",
-        "Tulip",
-    });
-
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        plant_money_info.push_back({(plt::PlantType)i, plant_names[i], (i + 1) * 2, (i + 1) * 3});
-    }
 
     // ==================================================
     // Initialize ECS World
@@ -55,22 +32,8 @@ App::App(int screen_w, int screen_h)
     map = std::make_unique<Map>(ecs_world.get());
 
     // ==================================================
-    // Load crop textures
+    // Load the tutorial textures
     // ==================================================
-    {
-        Image plant_tileset_img = LoadImage("objects.png");
-        plants_tex = LoadTextureFromImage(plant_tileset_img);
-        UnloadImage(plant_tileset_img);
-    }
-
-    // ==================================================
-    // Load the tileset textures
-    // ==================================================
-    {
-        Image tileset_img = LoadImage("tileset.png");
-        tileset_tex = LoadTextureFromImage(tileset_img);
-        UnloadImage(tileset_img);
-    }
 
     // ==================================================
     // Load the player textures
@@ -98,19 +61,14 @@ App::App(int screen_w, int screen_h)
         player_bck_tex = LoadTextureFromImage(walking_back_img);
         UnloadImage(walking_back_img);
     }
-
-    // ==================================================
-    // Add a Plant Bag
-    // ==================================================
-    flecs::entity bag_e = ecs_world->entity();
-    bag_e.set<plt::Position>({300, 250});
-    bag_e.set<plt::PlantBag>({plt::PlantType_Rose});
 }
 
 App::~App()
 {
-    UnloadFont(kaph_font);
-    UnloadTexture(plants_tex);
+    UnloadTexture(player_fwd_tex);
+    UnloadTexture(player_l_tex);
+    UnloadTexture(player_r_tex);
+    UnloadTexture(player_bck_tex);
 }
 
 void App::initSystems()
@@ -135,13 +93,6 @@ void App::initSystems()
                                                   {
                                                       DynamicBodySystem(e, pos, coll); //
                                                   });
-
-    flecs::system plant_system = ecs_world->system<plt::Position, plt::Plant>()
-                                     .kind(flecs::PreUpdate)
-                                     .each([&](flecs::entity e, plt::Position &pos, plt::Plant &plant)
-                                           {
-                                               PlantSystem(e, pos, plant); //
-                                           });
 
     flecs::system render_system = ecs_world->system()
                                       .kind(flecs::PostUpdate)
@@ -200,7 +151,7 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
     }
 
     dist = Vector2Normalize(dist);
-    // dist = Vector2Scale(dist, 1.5);
+    dist = Vector2Scale(dist, 4);
     dist = Vector2Add(Vector2{pos.x, pos.y}, dist);
 
     pos.x = dist.x;
@@ -223,158 +174,12 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
     }
 
     //--------------------------------------------------------------------------------------
-    // Check if we're on farmable land
-    //--------------------------------------------------------------------------------------
-    int curr_tile_x = int(pos.x) / 16;
-    int curr_tile_y = int(pos.y) / 16;
-
-    player.on_farmable_land = false;
-    flecs::filter<plt::Farmable> farmable_f = ecs_world->filter<plt::Farmable>();
-    farmable_f.each([&](flecs::entity e, plt::Farmable &farmable)
-                    {
-                        c2AABB farm_area = {farmable.area.x, farmable.area.y, farmable.area.x + farmable.area.width, farmable.area.y + farmable.area.height};
-                        if (!AABBtoPoint(farm_area, c2v{pos.x, pos.y}))
-                            return;
-
-                        player.on_farmable_land = true; //
-                    });
-
-    //--------------------------------------------------------------------------------------
     // Switch actions based on what we're holding
     //--------------------------------------------------------------------------------------
 
-    switch (player.holding_state)
+    if (player.is_holding_item)
     {
-    case plt::PlayerHoldState_Nothing:
-    {
-        //--------------------------------------------------------------------------------------
-        // Check if we're near a plant bag we can grab
-        //--------------------------------------------------------------------------------------
-        flecs::filter<plt::Position, plt::PlantBag> bag_f = ecs_world->filter<plt::Position, plt::PlantBag>();
-        bag_f.each([&](flecs::entity bag_e, plt::Position &bag_pos, plt::PlantBag &bag)
-                   {
-                       if (player.holding_state != plt::PlayerHoldState_Nothing)
-                           return;
 
-                       c2AABB bag_area = {bag_pos.x - 12, bag_pos.y - 12, bag_pos.x + 12, bag_pos.y + 12};
-                       if (!AABBtoPoint(bag_area, c2v{pos.x, pos.y}))
-                           return;
-
-                       has_collected_bag = true;
-                       bag_e.remove<plt::Position>();
-                       player.item = bag_e.id();
-                       player.holding_state = plt::PlayerHoldState_SeedBag;
-                       //
-                   });
-
-        //--------------------------------------------------------------------------------------
-        // Check if we want to harvest a plant
-        //--------------------------------------------------------------------------------------
-        if (player.on_farmable_land && IsKeyDown(KEY_E) && occupied_plant_area[curr_tile_x][curr_tile_y] != flecs::Empty)
-        {
-            flecs::entity_t plant_id = occupied_plant_area[curr_tile_x][curr_tile_y];
-            flecs::entity plant_ent = ecs_world->get_alive(plant_id);
-
-            plt::Plant *plant_comp = plant_ent.get_mut<plt::Plant>();
-
-            if (plant_comp->harvestable)
-            {
-                // Move the respective flower into our inventory
-                plant_ent.remove<plt::Position>();
-                player.item = plant_id;
-                player.holding_state = plt::PlayerHoldState_Flower;
-
-                has_collected_plant = true;
-
-                // Free up space for another flower
-                occupied_plant_area[curr_tile_x][curr_tile_y] = flecs::Empty;
-            }
-        }
-        //--------------------------------------------------------------------------------------
-        // Check if we can buy
-        //--------------------------------------------------------------------------------------
-        else if (IsKeyDown(KEY_E))
-        {
-            bool on_buyzone = false;
-            flecs::filter<plt::BuyZone> buyzone_f = ecs_world->filter<plt::BuyZone>();
-            buyzone_f.each([&](flecs::entity e, plt::BuyZone &bzone)
-                           {
-                               c2AABB buyzone_area = {bzone.zone.x, bzone.zone.y, bzone.zone.x + bzone.zone.width, bzone.zone.y + bzone.zone.height};
-                               if (!AABBtoPoint(buyzone_area, c2v{pos.x, pos.y}))
-                                   return;
-
-                               on_buyzone = true; //
-                           });
-
-            if (!on_buyzone)
-                break;
-
-            player.in_buy_menu = true;
-        }
-    }
-    break;
-    case plt::PlayerHoldState_SeedBag:
-    {
-        //--------------------------------------------------------------------------------------
-        // Check to plant a plant
-        //--------------------------------------------------------------------------------------
-        if (player.on_farmable_land && IsKeyDown(KEY_E) && occupied_plant_area[curr_tile_x][curr_tile_y] == flecs::Empty)
-        {
-            int x = curr_tile_x * 16 + 8;
-            int y = curr_tile_y * 16 + 8;
-
-            flecs::entity bag_ent = ecs_world->get_alive(player.item);
-            plt::PlantBag *bag_comp = bag_ent.get_mut<plt::PlantBag>();
-
-            flecs::entity plant_e = ecs_world->entity();
-            plant_e.set<plt::Position>({(float)x, (float)y});
-            plant_e.set<plt::Plant>({bag_comp->plant_type, 3, 3, 0, false});
-
-            has_planted_seed = true;
-
-            bag_ent.destruct();
-            player.holding_state = plt::PlayerHoldState_Nothing;
-
-            occupied_plant_area[curr_tile_x][curr_tile_y] = plant_e.id();
-        }
-    }
-    break;
-    case plt::PlayerHoldState_Flower:
-    {
-        //--------------------------------------------------------------------------------------
-        // Return plant to home for more seeds
-        //--------------------------------------------------------------------------------------
-        if (IsKeyDown(KEY_E))
-        {
-            bool on_homezone = false;
-            flecs::filter<plt::HomeZone> homezone_f = ecs_world->filter<plt::HomeZone>();
-            homezone_f.each([&](flecs::entity e, plt::HomeZone &hzone)
-                            {
-                                c2AABB homezone_area = {hzone.zone.x, hzone.zone.y, hzone.zone.x + hzone.zone.width, hzone.zone.y + hzone.zone.height};
-                                if (!AABBtoPoint(homezone_area, c2v{pos.x, pos.y}))
-                                    return;
-
-                                on_homezone = true; //
-                            });
-
-            if (!on_homezone)
-                break;
-
-            flecs::entity plant_ent = ecs_world->get_alive(player.item);
-            plt::Plant *plant_comp = plant_ent.get_mut<plt::Plant>();
-
-            has_sold_plant = true;
-
-            player.money += plant_money_info[plant_comp->plant_type].sell_value;
-
-            plant_ent.destruct();
-            player.holding_state = plt::PlayerHoldState_Nothing;
-        }
-    }
-    break;
-
-    default:
-        break;
     }
 }
 
@@ -392,30 +197,26 @@ void App::DynamicBodySystem(flecs::entity e, plt::Position &pos, plt::Collider &
     flecs::filter<plt::Position, plt::Collider, plt::SolidBody> solid_body_f = ecs_world->filter<plt::Position, plt::Collider, plt::SolidBody>();
     solid_body_f.each([&](flecs::entity s_e, plt::Position &s_pos, plt::Collider &s_coll, plt::SolidBody &sol)
                       {
-                          c2Manifold man;
-                          c2AABBtoAABBManifold(coll.body, s_coll.body, &man);
-                          if (man.count == 0)
+                          // Collision detection and mainfold generation
+                          c2Manifold m;
+                          c2AABBtoAABBManifold(coll.body, s_coll.body, &m);
+
+                          // Leave if there's no collision
+                          if (m.count == 0)
                               return;
 
-                          pos.x -= man.n.x;
-                          pos.y -= man.n.y; //
+                          // Resolve the collision if there is one
+                          Vector2 n = {m.n.x, m.n.y};
+                          for (int i = 0; i < m.count; i++)
+                          {
+                              Vector2 p = {m.contact_points[i].x, m.contact_points[i].y};
+                              float d = m.depths[i];
+                              pos.x -= n.x * d;
+                              pos.y -= n.y * d;
+                          }
+
+                          //
                       });
-}
-
-void App::PlantSystem(flecs::entity e, plt::Position &pos, plt::Plant &plant)
-{
-    plant.time_to_next_stage -= ecs_world->delta_time();
-
-    if (plant.time_to_next_stage <= 0 && plant.current_growth_stage < 3)
-    {
-        plant.time_to_next_stage = plant.time_per_stage;
-        plant.current_growth_stage += 1;
-    }
-
-    if (plant.current_growth_stage == 3)
-    {
-        plant.harvestable = true;
-    }
 }
 
 bool compSPR(plt::SPR i, plt::SPR j)
@@ -450,6 +251,8 @@ void App::RenderSystem()
     processLoopingEase(inv_scale, ecs_world->delta_time());
     processLoopingEase(text_y_add, ecs_world->delta_time());
 
+    time_counter += ecs_world->delta_time();
+
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
@@ -463,27 +266,7 @@ void App::RenderSystem()
     //--------------------------------------------------------------------------------------
     render_orders.clear();
 
-    //--------------------------------------------------------------------------------------
-    // Render Home
-    //--------------------------------------------------------------------------------------
-    flecs::filter<plt::Home> home_f = ecs_world->filter<plt::Home>();
-    home_f.each([&](flecs::entity e, plt::Home &home)
-                {
-                    Vector2 draw_pos = {home.pos.x - 24, home.pos.y - 48};
-                    render_orders.push_back({home.pos.y, tileset_tex, Rectangle{272.f, 48, 48, 48}, draw_pos, WHITE});
-                    //
-                });
-
-    //--------------------------------------------------------------------------------------
-    // Render Plant Bags
-    //--------------------------------------------------------------------------------------
-    flecs::filter<plt::Position, plt::PlantBag> bag_f = ecs_world->filter<plt::Position, plt::PlantBag>();
-    bag_f.each([&](flecs::entity e, plt::Position &pos, plt::PlantBag &bag)
-               {
-                   Vector2 draw_pos = {pos.x - 8, pos.y - 10};
-                   render_orders.push_back({pos.y, plants_tex, Rectangle{16.f * bag.plant_type, 0, 16, 16}, draw_pos, WHITE});
-                   //
-               });
+    // GuiLabel(Rectangle{0, 0, 512, 200}, std::to_string(time_counter).c_str());
 
     //--------------------------------------------------------------------------------------
     // Render Player
@@ -501,7 +284,7 @@ void App::RenderSystem()
                       }
 
                       // Subtract a bit more than 32 from y so sprite is a bit above the collidersa
-                      Vector2 draw_pos = {pos.x - 40, pos.y - 32 - 11};
+                      Vector2 draw_pos = {round(pos.x - 40), round(pos.y - 32 - 11)};
 
                       switch (player.move_state)
                       {
@@ -527,47 +310,6 @@ void App::RenderSystem()
                   });
 
     //--------------------------------------------------------------------------------------
-    // Render Plants
-    //--------------------------------------------------------------------------------------
-    flecs::filter<plt::Position, plt::Plant> plant_f = ecs_world->filter<plt::Position, plt::Plant>();
-    plant_f.each([&](flecs::entity e, plt::Position &pos, plt::Plant &plant)
-                 {
-                     float x, y, w, h;
-                     Vector2 draw_pos = {pos.x - 8, pos.y - 8};
-
-                     x = 16 * plant.plant_type;
-                     w = 16;
-
-                     if (plant.current_growth_stage < 2)
-                     {
-                         y = 32 + 16 * plant.current_growth_stage;
-                         h = 16;
-                     }
-                     else
-                     {
-                         y = 64 + 32 * (plant.current_growth_stage - 2);
-                         h = 32;
-                         draw_pos.y -= 16;
-                     }
-
-                     render_orders.push_back({pos.y, plants_tex, Rectangle{x, y, w, h}, draw_pos, WHITE});
-                     //
-                 });
-
-    //--------------------------------------------------------------------------------------
-    // Render Decor
-    //--------------------------------------------------------------------------------------
-    flecs::filter<plt::Position, plt::Deco> deco_f = ecs_world->filter<plt::Position, plt::Deco>();
-    deco_f.each([&](flecs::entity e, plt::Position &pos, plt::Deco &deco)
-                {
-                    Rectangle target = {16.f * deco.type, 80.f, 16, 16};
-                    Vector2 draw_pos = {pos.x - 8, pos.y - 10};
-
-                    render_orders.push_back({pos.y, tileset_tex, target, draw_pos, WHITE});
-                    //
-                });
-
-    //--------------------------------------------------------------------------------------
     // Render all textures with y-level sorting
     //--------------------------------------------------------------------------------------
 
@@ -579,86 +321,13 @@ void App::RenderSystem()
     }
 
     //--------------------------------------------------------------------------------------
-    // Render Inventory
+    // Render GUI
     //--------------------------------------------------------------------------------------
 
-    bool is_player_in_buy_menu = false;
-    {
-        flecs::filter<plt::Position, plt::Player> inv_f = ecs_world->filter<plt::Position, plt::Player>();
-        inv_f.each([&](flecs::entity e, plt::Position &pos, plt::Player &player)
-                   {
-                       renderPlayerInventory(e, pos, player);
-                       renderPlayerMoney(e, pos, player);
+    //--------------------------------------------------------------------------------------
+    // Render Tutorial
+    //--------------------------------------------------------------------------------------
 
-                       if (player.in_buy_menu)
-                       {
-                           is_player_in_buy_menu = true;
-                           renderPlayerBuyMenu(e, pos, player);
-                       }
-                       //
-                   });
-    }
-
-    GuiSetFont(kaph_font);
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT_VERTICAL, TEXT_ALIGN_TOP);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, kaph_font.baseSize / 4);
-    GuiSetStyle(DEFAULT, TEXT_LINE_SPACING, 30);
-
-    float shadow_offset = 1.5;
-
-    if (!is_player_in_buy_menu)
-    {
-        if (!has_collected_bag)
-        {
-            drawTutorialText("Collect the Bag");
-
-            flecs::filter<plt::Position, plt::PlantBag> bag_f = ecs_world->filter<plt::Position, plt::PlantBag>();
-            bag_f.each([&](flecs::entity bag_e, plt::Position &bag_pos, plt::PlantBag &bag)
-                       {
-                           drawAttentionArrow(Vector2{bag_pos.x, bag_pos.y}); //
-                       });
-        }
-        else if (!has_planted_seed)
-        {
-            drawTutorialText("Plant the seed\nin the shirt");
-            drawAttentionArrow(Vector2{screen_w / 2.f, screen_h / 2.f});
-        }
-        else if (!has_collected_plant)
-        {
-            flecs::filter<plt::Position, plt::Plant> plant_f = ecs_world->filter<plt::Position, plt::Plant>();
-            plant_f.each([&](flecs::entity bag_e, plt::Position &plt_pos, plt::Plant &plant)
-                         {
-                             if (plant.current_growth_stage != 3)
-                                 drawTutorialText("LET IT GROW");
-                             else
-                                 drawTutorialText("Harvest the plant");
-
-                             drawAttentionArrow(Vector2{plt_pos.x, plt_pos.y}); //
-                         });
-        }
-        else if (!has_sold_plant)
-        {
-            drawTutorialText("Sell the plant");
-
-            flecs::filter<plt::Position, plt::Home> bag_f = ecs_world->filter<plt::Position, plt::Home>();
-            bag_f.each([&](flecs::entity bag_e, plt::Position &home_pos, plt::Home &home)
-                       {
-                           drawAttentionArrow(Vector2{home_pos.x, home_pos.y}); //
-                       });
-        }
-        else if (!has_bought_seeds)
-        {
-            drawTutorialText("Buy more seeds");
-
-            flecs::filter<plt::BuyZone> bz_f = ecs_world->filter<plt::BuyZone>();
-            bz_f.each([&](flecs::entity bz_e, plt::BuyZone &bz)
-                      {
-                          drawAttentionArrow(Vector2{bz.zone.x + bz.zone.width / 2, bz.zone.y + bz.zone.height / 2}); //
-                      });
-        }
-    }
 
     //--------------------------------------------------------------------------------------
     //
@@ -666,10 +335,9 @@ void App::RenderSystem()
     //
     //--------------------------------------------------------------------------------------
 
-    // GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
-    // GuiToggle(Rectangle{512 - 10 - 100, 10, 100, 20}, "Render Colliders", &render_colliders);
-    // GuiToggle(Rectangle{512 - 10 - 100, 40, 100, 20}, "Render Farmable", &render_farmable);
-    // GuiToggle(Rectangle{512 - 10 - 100, 70, 100, 20}, "Render Positions", &render_positions);
+    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
+    GuiToggle(Rectangle{screen_w - 10.f - 100, 10, 100, 20}, "Render Colliders", &render_colliders);
+    GuiToggle(Rectangle{screen_w - 10.f - 100, 40, 100, 20}, "Render Positions", &render_positions);
 
     //--------------------------------------------------------------------------------------
     // Render Colliders (DEBUG)
@@ -686,19 +354,6 @@ void App::RenderSystem()
     }
 
     //--------------------------------------------------------------------------------------
-    // Render Farmable Land (DEBUG)
-    //--------------------------------------------------------------------------------------
-    if (render_farmable)
-    {
-        flecs::filter<plt::Farmable> farmable_f = ecs_world->filter<plt::Farmable>();
-        farmable_f.each([&](flecs::entity e, plt::Farmable &farmable)
-                        {
-                            DrawRectangleLinesEx(farmable.area, 1, RED);
-                            //
-                        });
-    }
-
-    //--------------------------------------------------------------------------------------
     // Render Positions (DEBUG)
     //--------------------------------------------------------------------------------------
     if (render_positions)
@@ -706,7 +361,8 @@ void App::RenderSystem()
         flecs::filter<plt::Position> pos_f = ecs_world->filter<plt::Position>();
         pos_f.each([&](flecs::entity e, plt::Position &pos)
                    {
-                       DrawCircleV(Vector2{pos.x, pos.y}, 2, WHITE);
+                       DrawCircleV(Vector2{pos.x, pos.y}, 4, ORANGE);
+                       DrawCircleV(Vector2{pos.x, pos.y}, 3, RED);
                        //
                    });
     }
@@ -733,143 +389,6 @@ void App::drawTutorialText(std::string text)
     GuiLabel(Rectangle{screen_w / 2.f - 200 + 2, screen_h / 2.f - 240 + text_y_add.val + 2, 400, 200}, text.c_str());
     GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(MAROON));
     GuiLabel(Rectangle{screen_w / 2.f - 200, screen_h / 2.f - 240 + text_y_add.val, 400, 200}, text.c_str());
-}
-
-void App::renderPlayerMoney(flecs::entity e, plt::Position &pos, plt::Player &player)
-{
-    GuiSetFont(kaph_font);
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT_VERTICAL, TEXT_ALIGN_MIDDLE);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, kaph_font.baseSize / 2);
-    GuiSetStyle(DEFAULT, TEXT_LINE_SPACING, 30);
-
-    std::string money_str = "$" + std::to_string(player.money);
-
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(ColorAlpha(BLACK, 0.9)));
-    GuiLabel(Rectangle{10.f + 2, 374.f + 64 + 2, 354.f, 64}, money_str.c_str());
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(MAROON));
-    GuiLabel(Rectangle{10.f, 374.f + 64, 354.f, 64}, money_str.c_str());
-}
-
-void App::renderPlayerInventory(flecs::entity e, plt::Position &pos, plt::Player &player)
-{
-    // Draw Background Rectangle
-    DrawRectangleRec(Rectangle{374.f, 374.f, 128, 128}, ColorAlpha(WHITE, 0.4));
-
-    if (player.holding_state == plt::PlayerHoldState_Nothing)
-        return;
-
-    flecs::entity item = ecs_world->get_alive(player.item);
-
-    // Target Rectangle
-    Rectangle target_rec = {384.f + 54, 384.f + 54, 108 * inv_scale.val, 108 * inv_scale.val};
-    Vector2 origin = {target_rec.width / 2, target_rec.height / 2};
-
-    switch (player.holding_state)
-    {
-    case plt::PlayerHoldState_SeedBag:
-    {
-        plt::PlantBag *bag = item.get_mut<plt::PlantBag>();
-        DrawTexturePro(plants_tex, Rectangle{16.f * bag->plant_type, 0, 16, 16}, target_rec, origin, inv_rot.val, WHITE);
-    }
-    break;
-    case plt::PlayerHoldState_Flower:
-    {
-        plt::Plant *plant = item.get_mut<plt::Plant>();
-        DrawTexturePro(plants_tex, Rectangle{16.f * plant->plant_type, 16, 16, 16}, target_rec, origin, inv_rot.val, WHITE);
-    }
-    break;
-
-    default:
-        break;
-    }
-}
-
-void App::renderPlayerBuyMenu(flecs::entity e, plt::Position &pos, plt::Player &player)
-{
-    Font prev_font = GuiGetFont();
-
-    // Draw shop background
-    Rectangle menu_rec = Rectangle{10.f, 70.f, screen_w - 20.f, 294.f};
-    DrawRectangleRec(menu_rec, ColorAlpha(WHITE, 0.7));
-
-    // Draw shop title
-    GuiSetFont(kaph_font);
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT_VERTICAL, TEXT_ALIGN_TOP);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, kaph_font.baseSize / 3);
-    GuiSetStyle(DEFAULT, TEXT_LINE_SPACING, 30);
-
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(ColorAlpha(BLACK, 0.9)));
-    GuiLabel(Rectangle{menu_rec.x + 10 + 2, menu_rec.y + 10 + 2, menu_rec.width - 20.f, 30}, "SHOP");
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(MAROON));
-    GuiLabel(Rectangle{menu_rec.x + 10, menu_rec.y + 10, menu_rec.width - 20.f, 30}, "SHOP");
-
-    // Draw Buy
-    GuiSetFont(GuiGetFont());
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(MAROON));
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
-    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT_VERTICAL, TEXT_ALIGN_CENTER);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, GuiDefaultProperty::TEXT_SIZE - 3);
-    GuiSetStyle(DEFAULT, TEXT_LINE_SPACING, GuiDefaultProperty::TEXT_LINE_SPACING);
-
-    if (GuiButton(Rectangle{menu_rec.x + 10, menu_rec.y + 10, 50.f, 25}, "Exit"))
-    {
-        player.in_buy_menu = false;
-    }
-
-    // Draw the rectangles for each
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        Rectangle seed_rec = {20.f + 246 * (i % 2), 125.f + 60 * (i / 2), 226, 45};
-
-        DrawRectangleRec(seed_rec, Color{0xD8, 0xE8, 0xBC, 0xFF});
-
-        plt::PlantMoneyInfo curr_plt_info = plant_money_info[i];
-
-        // Render Plant Info
-        GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
-        GuiSetStyle(DEFAULT, TEXT_ALIGNMENT_VERTICAL, TEXT_ALIGN_TOP);
-
-        std::string buy_str = "Buy Val: " + std::to_string(curr_plt_info.buy_value);
-        std::string sell_str = "Sell Val: " + std::to_string(curr_plt_info.sell_value);
-        GuiLabel(Rectangle{seed_rec.x + 5, seed_rec.y + 5, 100, 30}, curr_plt_info.name.c_str());
-
-        GuiSetStyle(DEFAULT, TEXT_SIZE, GuiDefaultProperty::TEXT_SIZE - 5);
-        GuiLabel(Rectangle{seed_rec.x + 5, seed_rec.y + 20, 100, 30}, buy_str.c_str());
-        GuiLabel(Rectangle{seed_rec.x + 5, seed_rec.y + 30, 100, 30}, sell_str.c_str());
-
-        Rectangle target_rec = {seed_rec.x + seed_rec.width - 32 - 8, seed_rec.y + 7, 32, 32};
-
-        if (player.money >= curr_plt_info.buy_value)
-        {
-            if (GuiButton(target_rec, ""))
-            {
-                flecs::entity bag_e = ecs_world->entity();
-                bag_e.set<plt::PlantBag>({curr_plt_info.plant_type});
-
-                player.money -= curr_plt_info.buy_value;
-                has_bought_seeds = true;
-
-                player.holding_state = plt::PlayerHoldState_SeedBag;
-                player.item = bag_e.id();
-                player.in_buy_menu = false;
-            }
-
-            DrawTexturePro(plants_tex, Rectangle{16.f * i, 0, 16, 16}, target_rec, Vector2{0, 0}, 0, WHITE);
-        }
-        else
-        {
-            GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
-            GuiSetStyle(DEFAULT, TEXT_ALIGNMENT_VERTICAL, TEXT_ALIGN_MIDDLE);
-            GuiSetStyle(DEFAULT, TEXT_SIZE, GuiDefaultProperty::TEXT_SIZE);
-            GuiLabel(target_rec, "$");
-        }
-    }
-
-    GuiSetFont(prev_font);
 }
 
 void App::drawPulseRect(Rectangle pulse_rec)

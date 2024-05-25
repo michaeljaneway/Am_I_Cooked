@@ -43,13 +43,6 @@ namespace plt
         PlayerMvnmtState_Forward
     };
 
-    enum PlayerHoldState : uint8_t
-    {
-        PlayerHoldState_Nothing,
-        PlayerHoldState_SeedBag,
-        PlayerHoldState_Flower,
-    };
-
     struct Player
     {
         bool on_farmable_land;
@@ -60,7 +53,7 @@ namespace plt
 
         // Set time per frame change
         float time_per_fchange;
-
+ 
         // Time till next frame change
         float time_till_fchange;
 
@@ -70,7 +63,7 @@ namespace plt
         flecs::entity_t item;
 
         // The type of item the player is holding
-        PlayerHoldState holding_state;
+        bool is_holding_item;
 
         // Is the player in the buy menu
         bool in_buy_menu;
@@ -79,78 +72,6 @@ namespace plt
         int money;
     };
 
-    //--------------------------------------------------------------------------------------
-    // Plant
-    //--------------------------------------------------------------------------------------
-    enum PlantType : uint8_t
-    {
-        PlantType_Rose,
-        PlantType_Pointy,
-        PlantType_Daisy,
-        PlantType_Marigold,
-        PlantType_Delphinium,
-        PlantType_Lavender,
-        PlantType_Primrose,
-        PlantType_Tulip,
-        PlantType_Waterlily
-    };
-
-    struct Plant
-    {
-        PlantType plant_type;
-
-        float time_per_stage;
-        float time_to_next_stage;
-
-        // Number of stages
-        uint8_t current_growth_stage;
-
-        bool harvestable;
-    };
-
-    struct PlantBag
-    {
-        PlantType plant_type;
-    };
-
-    struct PlantMoneyInfo
-    {
-        PlantType plant_type;
-        std::string name;
-        int buy_value;
-        int sell_value;
-    };
-
-    struct Deco
-    {
-        uint8_t type;
-    };
-
-    //--------------------------------------------------------------------------------------
-    // Describes a farmable area (no Position comp. required)
-    //--------------------------------------------------------------------------------------
-    struct Farmable
-    {
-        Rectangle area;
-    };
-
-    //--------------------------------------------------------------------------------------
-    // Home
-    //--------------------------------------------------------------------------------------
-    struct Home
-    {
-        Vector2 pos;
-    };
-
-    struct HomeZone
-    {
-        Rectangle zone;
-    };
-
-    struct BuyZone
-    {
-        Rectangle zone;
-    };
 
     //--------------------------------------------------------------------------------------
     // Sprite Render Order (or Instruction) (for y-level rendering)

@@ -24,8 +24,8 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screen_w = 512;
-    const int screen_h = 512;
+    const int screen_w = 960;
+    const int screen_h = 640;
 
     InitAudioDevice();
 
@@ -33,7 +33,7 @@ int main(void)
     SetConfigFlags(FLAG_MSAA_4X_HINT);
 
     // Init window and framerate
-    InitWindow(screen_w, screen_h, "RockinPlants");
+    InitWindow(screen_w, screen_h, "SpeedJam5");
 
     // Set target FPS
     SetTargetFPS(60);
@@ -44,11 +44,7 @@ int main(void)
     // Set the emscripten main loop
     emscripten_set_main_loop(updateAndDraw, 0, 1);
     //--------------------------------------------------------------------------------------
-
-    // Main loop
-    while (!WindowShouldClose()) // Detect window close button or ESC key
-        updateAndDraw();
-
+ 
     // De-Initialization
     //--------------------------------------------------------------------------------------
     CloseAudioDevice();

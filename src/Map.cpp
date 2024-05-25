@@ -8,43 +8,52 @@ Map::Map(flecs::world *ecs_world)
     this->ecs_world = ecs_world;
 
     //--------------------------------------------------------------------------------------
-    // Initialize map rendertarget
-    //--------------------------------------------------------------------------------------
-    map_target = LoadRenderTexture(512, 512);
-
-    //--------------------------------------------------------------------------------------
     // Parse Map
     //--------------------------------------------------------------------------------------
-    map = cute_tiled_load_map_from_file("rockinplants.json", NULL);
+    map = cute_tiled_load_map_from_file("speedjam5map.json", NULL);
 
     //--------------------------------------------------------------------------------------
     // Load Tileset Textures
     //--------------------------------------------------------------------------------------
-    cute_tiled_tileset_t *tileset_ptr = map->tilesets;
-    while (tileset_ptr)
+    cute_tiled_tileset_t *ts_ptr = map->tilesets;
+    while (ts_ptr)
     {
-        Image tileset_img = LoadImage(tileset_ptr->image.ptr);
-        int tile_count = tileset_ptr->tilecount;
+        // Load tileset's image
+        Image ts_img = LoadImage(ts_ptr->image.ptr);
+        TilesetInfo ts_info;
+        ts_info.info = *ts_ptr;
 
-        if (tilesets.size() == 0)
-            tilesets.push_back(std::make_pair(tile_count, LoadTextureFromImage(tileset_img)));
-        else
-            tilesets.push_back(std::make_pair(tile_count + tilesets.back().first, LoadTextureFromImage(tileset_img)));
+        // Load texture
+        ts_info.tex = LoadTextureFromImage(ts_img);
+        UnloadImage(ts_img);
 
-        UnloadImage(tileset_img);
+        // Add to tilesets
+        tilesets_info.push_back(ts_info);
 
-        tileset_ptr = tileset_ptr->next;
+        // Go onto next tileset
+        ts_ptr = ts_ptr->next;
     }
 
     //--------------------------------------------------------------------------------------
-    // Render map layers to RenderTexture
+    // Get map basic data
     //--------------------------------------------------------------------------------------
     int map_w = map->width;
     int map_h = map->height;
 
+    int tile_w = map->tilewidth;
+    int tile_h = map->tileheight;
+
+    //--------------------------------------------------------------------------------------
+    // Initialize map rendertarget
+    //--------------------------------------------------------------------------------------
+    map_target = LoadRenderTexture(map_w * tile_w, map_h * tile_h);
+
+    //--------------------------------------------------------------------------------------
+    // Render map layers to RenderTexture
+    //--------------------------------------------------------------------------------------
+
     cute_tiled_layer_t *layer = map->layers;
 
-    BeginTextureMode(map_target);
     while (layer)
     {
         if (std::string("tilelayer") == layer->type.ptr)
@@ -52,29 +61,39 @@ Map::Map(flecs::world *ecs_world)
             int *data = layer->data;
             int data_count = layer->data_count;
 
-            for (int i = 0; i < map_w; i++)
+            for (int column = 0; column < map_w; column++)
             {
-                for (int j = 0; j < map_h; j++)
+                for (int row = 0; row < map_h; row++)
                 {
                     // Get the tile num for the tile on this layer
-                    int tile_data = data[map_w * j + i];
+                    int tile_data = data[map_w * row + column];
+
                     if (tile_data == 0)
                         continue;
 
-                    // Figure out the tile's texture
-                    Texture2D *tile_tex = NULL;
-                    for (auto &tile_pair : tilesets)
+                    // Determine the tile's tileset
+                    TilesetInfo *this_tile_info;
+
+                    for (auto &tile_info : tilesets_info)
                     {
-                        if (tile_data <= tile_pair.first)
+                        if (tile_info.info.firstgid <= tile_data && tile_data <= tile_info.info.firstgid + tile_info.info.tilecount - 1)
                         {
-                            tile_tex = &(tile_pair.second);
+                            this_tile_info = &tile_info;
                             break;
                         }
                     }
 
                     // Draw to the rendertexture
-                    Rectangle src_rect = {16.f * ((tile_data - 1) % 23), 16.f * ((tile_data - 1) / 23), 16.f, 16.f};
-                    DrawTextureRec(*tile_tex, src_rect, Vector2{i * 16.f, j * 16.f}, WHITE);
+                    Rectangle src_rect = {(float)tile_w * ((tile_data - this_tile_info->info.firstgid) % this_tile_info->info.columns),
+                                          (float)tile_h * ((tile_data - this_tile_info->info.firstgid) / this_tile_info->info.columns),
+                                          (float)tile_w,
+                                          (float)tile_h};
+
+                    Vector2 dest_pos = {(float)column * tile_w, (float)row * tile_h};
+
+                    BeginTextureMode(map_target);
+                    DrawTextureRec(this_tile_info->tex, src_rect, dest_pos, WHITE);
+                    EndTextureMode();
                 }
             }
         }
@@ -97,21 +116,6 @@ Map::Map(flecs::world *ecs_world)
                     layer_obj = layer_obj->next;
                 }
             }
-            //--------------------------------------------------------------------------------------
-            // Add farmable land
-            //--------------------------------------------------------------------------------------
-            else if (std::string("Farmable") == layer->name.ptr)
-            {
-                cute_tiled_object_t *layer_obj = layer->objects;
-
-                while (layer_obj)
-                {
-                    flecs::entity solid_e = ecs_world->entity();
-                    solid_e.set<plt::Farmable>({Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
-
-                    layer_obj = layer_obj->next;
-                }
-            }
 
             //--------------------------------------------------------------------------------------
             // Add objects
@@ -123,48 +127,15 @@ Map::Map(flecs::world *ecs_world)
                 while (layer_obj)
                 {
                     // ==================================================
-                    // Add the house
+                    // Add the player at spawn
                     // ==================================================
-                    if (std::string("Home") == layer_obj->name.ptr)
-                    {
-                        flecs::entity home_e = ecs_world->entity();
-                        home_e.set<plt::Home>({Vector2{layer_obj->x, layer_obj->y}});
-                        home_e.set<plt::Position>({layer_obj->x, layer_obj->y});
-                        home_e.set<plt::Collider>({Rectangle{-19, -10, 38, 10}, c2AABB{0, 0, 0, 0}});
-                        home_e.set<plt::SolidBody>({1});
-                    }
-                    // ==================================================
-                    // Add the HomeZone
-                    // ==================================================
-                    else if (std::string("HomeZone") == layer_obj->name.ptr)
-                    {
-                        flecs::entity homezone_e = ecs_world->entity();
-                        homezone_e.set<plt::HomeZone>({Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
-                    }
-                    // ==================================================
-                    // Add the BuyZone
-                    // ==================================================
-                    else if (std::string("BuyZone") == layer_obj->name.ptr)
-                    {
-                        flecs::entity buyzone_e = ecs_world->entity();
-                        buyzone_e.set<plt::BuyZone>({Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
-                    }
-                    // ==================================================
-                    // Add the player
-                    // ==================================================
-                    else if (std::string("Spawn") == layer_obj->name.ptr)
+                    if (std::string("Spawn") == layer_obj->name.ptr)
                     {
                         flecs::entity player_e = ecs_world->entity();
                         player_e.set<plt::Position>({layer_obj->x, layer_obj->y});
-                        player_e.set<plt::Player>({false, plt::PlayerMvnmtState_Idle, 0, 0.1, 0.3, 0, flecs::Empty, plt::PlayerHoldState_Nothing, false, 0});
+                        player_e.set<plt::Player>({false, plt::PlayerMvnmtState_Idle, 0, 0.1, 0.3, 0, flecs::Empty, false, false, 0});
                         player_e.set<plt::Collider>({Rectangle{-7, -2, 14, 8}, c2AABB{0, 0, 0, 0}});
                         player_e.set<plt::DynamicBody>({1});
-                    }
-                    else if (std::string("Deco") == layer_obj->name.ptr)
-                    {
-                        flecs::entity deco_e = ecs_world->entity();
-                        deco_e.set<plt::Position>({layer_obj->x, layer_obj->y});
-                        deco_e.set<plt::Deco>({(uint8_t)(rand() % 16)});
                     }
 
                     layer_obj = layer_obj->next;
@@ -174,15 +145,14 @@ Map::Map(flecs::world *ecs_world)
 
         layer = layer->next;
     }
-    EndTextureMode();
 }
 
 Map::~Map()
 {
     UnloadRenderTexture(map_target);
 
-    for (auto &tex : tilesets)
-        UnloadTexture(tex.second);
+    for (auto &ts_info : tilesets_info)
+        UnloadTexture(ts_info.tex);
 
     cute_tiled_free_map(map);
 }
