@@ -28,24 +28,40 @@ namespace plt
     // Food Order
     //--------------------------------------------------------------------------------------
 
-    enum DishType
-    {
-        Plate,
-        Bowl,
-        PlateAndKebab
-    };
-
     enum IngredientState
     {
         Whole, // RAW
         LeftPile,
-        CenterPile,
         RightPile,
+        CenterPile,
         SingleKebab,
         ThreeKebabs,
         TopKebab,
         MiddleKebab,
         BottomKebab
+    };
+
+    enum BowlFillType
+    {
+        BowlFillType_None,
+        BowlFillType_Red,
+        BowlFillType_Yellow,
+        BowlFillType_Green,
+        BowlFillType_Brown,
+    };
+
+    enum DishType
+    {
+        DishType_Plate,
+        DishType_Bowl
+    };
+
+    struct Dish
+    {
+        std::string name;
+        DishType type;
+        Vector2 pos;
+        BowlFillType fill;
     };
 
     struct Ingredient
@@ -54,6 +70,18 @@ namespace plt
         Vector2 pos;
         bool cookable;
         IngredientState state;
+    };
+
+    // A restaurant order
+    struct Order
+    {
+        std::vector<Dish> dishes;
+        std::vector<Ingredient> ingredients;
+
+        // Pair where:
+        // - First: 0 for dishes, 1 for ingredients
+        // - Second: Index in the respective list
+        std::vector<std::pair<int,int>> indicies;
     };
 
     //--------------------------------------------------------------------------------------
@@ -95,6 +123,13 @@ namespace plt
         PlayerMvnmtState_Forward
     };
 
+    enum PlayerHoldingType
+    {
+        PlayerHoldingType_None,
+        PlayerHoldingType_Ingredient,
+        PlayerHoldingType_Dish,
+    };
+
     struct Player
     {
         bool on_farmable_land;
@@ -114,8 +149,8 @@ namespace plt
         // Item the player is holding
         flecs::entity_t item;
 
-        // Is the player holding an item
-        bool is_holding_item;
+        // Type of item the player is holding
+        PlayerHoldingType holding_type;
 
         // Interacting with cooking zone
         CookingZoneType cooking_zone;

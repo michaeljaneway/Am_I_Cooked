@@ -60,6 +60,22 @@ void setGuiTextStyle(Font f, int color, int h_align, int v_align, int size, int 
 }
 
 // ==================================================
+// Order Functions
+// ==================================================
+void addDishToOrder(plt::Order &o, plt::Dish dish)
+{
+    o.dishes.push_back(dish);
+    o.indicies.push_back(std::make_pair(0, o.dishes.size() - 1));
+}
+
+void addIngredientToOrder(plt::Order &o, plt::Ingredient ing)
+{
+    o.ingredients.push_back(ing);
+    o.indicies.push_back(std::make_pair(1, o.ingredients.size() - 1));
+}
+
+
+// ==================================================
 // App
 // ==================================================
 App::App(int screen_w, int screen_h)
@@ -76,6 +92,7 @@ App::App(int screen_w, int screen_h)
     is_audio_initialized = false;
 
     lookout_font = LoadFontEx("fonts/Lookout 7.ttf", 128, 0, 250);
+    fear_font = LoadFontEx("fonts/Fear 11.ttf", 128, 0, 250);
 
     inv_rot = {0.0, 20, 20, true, -1, 1, EaseInOutCubic};
     inv_scale = {0.0, 40, 40, true, 0.95, 1, EaseInOutCubic};
@@ -172,37 +189,54 @@ void App::initFood()
     ingredients.push_back({"Yam", {224, 64}, false, plt::Whole});
     ingredients.push_back({"Purple Yam", {320, 64}, false, plt::Whole});
     ingredients.push_back({"Tomato", {384, 64}, false, plt::Whole});
+
+    ingredients.push_back({"Chicken Leg", {0, 512}, true, plt::Whole});
+    ingredients.push_back({"Sausage", {64, 512}, true, plt::Whole});
+
     ingredients.push_back({"Corn", {448, 64}, false, plt::Whole});
     ingredients.push_back({"Onion", {480, 64}, false, plt::Whole});
     ingredients.push_back({"Red Onion", {512, 64}, false, plt::Whole});
     ingredients.push_back({"Purple Onion", {544, 64}, false, plt::Whole});
     ingredients.push_back({"Green Pepper", {576, 64}, false, plt::Whole});
     ingredients.push_back({"Red Pepper", {608, 64}, false, plt::Whole});
-    ingredients.push_back({"Orange Pepper", {608, 64}, false, plt::Whole});
-    ingredients.push_back({"Yellow Pepper", {608, 64}, false, plt::Whole});
+    ingredients.push_back({"Orange Pepper", {640, 64}, false, plt::Whole});
+
+    ingredients.push_back({"Bacon", {96, 512}, true, plt::Whole});
+    ingredients.push_back({"Flank", {128, 512}, true, plt::Whole});
+
+    ingredients.push_back({"Yellow Pepper", {672, 64}, false, plt::Whole});
     ingredients.push_back({"Brussel Sprouts", {736, 64}, false, plt::Whole});
     ingredients.push_back({"Cauliflower", {768, 64}, false, plt::Whole});
     ingredients.push_back({"Broccoli", {800, 64}, false, plt::Whole});
     ingredients.push_back({"Squash", {864, 64}, false, plt::Whole});
     ingredients.push_back({"Cucumber", {896, 64}, false, plt::Whole});
     ingredients.push_back({"Radish", {928, 64}, false, plt::Whole});
-    ingredients.push_back({"Turnip", {960, 64}, false, plt::Whole});
 
-    // Meats
-    ingredients.push_back({"Chicken Leg", {0, 512}, true, plt::Whole});
-    ingredients.push_back({"Sausage", {64, 512}, true, plt::Whole});
-    ingredients.push_back({"Bacon", {96, 512}, true, plt::Whole});
-    ingredients.push_back({"Flank", {128, 512}, true, plt::Whole});
     ingredients.push_back({"Meatballs", {160, 512}, true, plt::Whole});
     ingredients.push_back({"Steak", {224, 512}, true, plt::Whole});
-    ingredients.push_back({"Liver", {256, 512}, true, plt::Whole});
 
-    // Fruit
+    ingredients.push_back({"Turnip", {960, 64}, false, plt::Whole});
     ingredients.push_back({"Apple", {800, 512}, false, plt::Whole});
     ingredients.push_back({"Orange", {832, 512}, false, plt::Whole});
     ingredients.push_back({"Pineapple", {896, 512}, false, plt::Whole});
     ingredients.push_back({"Strawberry", {928, 512}, false, plt::Whole});
     ingredients.push_back({"Kiwi", {992, 512}, false, plt::Whole});
+
+    // Bowls
+    // dishes.push_back({"Small Bowl", plt::DishType_Bowl, {0, 0}, plt::BowlFillType_None});
+    // dishes.push_back({"Medium Bowl", plt::DishType_Bowl, {32, 0}, plt::BowlFillType_None});
+    dishes.push_back({"Large Bowl", plt::DishType_Bowl, {64, 0}, plt::BowlFillType_None});
+
+    // Plates
+    // dishes.push_back({"Small Plate", plt::DishType_Plate, {96, 0}, plt::BowlFillType_None});
+    // dishes.push_back({"Medium Plate", plt::DishType_Plate, {128, 0}, plt::BowlFillType_None});
+    dishes.push_back({"Large Plate", plt::DishType_Plate, {160, 0}, plt::BowlFillType_None});
+
+    // Fills
+    bowl_fills.push_back(Vector2{128, 32});
+    bowl_fills.push_back(Vector2{192, 32});
+    bowl_fills.push_back(Vector2{256, 32});
+    bowl_fills.push_back(Vector2{320, 32});
 }
 
 void App::runFrame()
@@ -258,7 +292,9 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
         player.time_till_fchange = player.time_per_fchange;
     }
 
-    if (IsKeyPressed(KEY_E))
+    plt::CookingZoneType new_zone_type = plt::CookingZone_None;
+
+    if (IsKeyDown(KEY_E))
     {
         flecs::filter<plt::CookingZone> cooking_zone_f = ecs_world->filter<plt::CookingZone>();
         cooking_zone_f.each([&](flecs::entity e, plt::CookingZone &c_zone)
@@ -266,7 +302,7 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
                                 if (!AABBtoPoint(rectToAABB(c_zone.zone), c2v{pos.x, pos.y}))
                                     return;
 
-                                player.cooking_zone = c_zone.type; //
+                                new_zone_type = c_zone.type; //
                             });
     }
 
@@ -274,8 +310,63 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
     // Switch actions based on what we're holding
     //--------------------------------------------------------------------------------------
 
-    if (player.is_holding_item)
+    switch (new_zone_type)
     {
+    case plt::CookingZone_None:
+        break;
+
+    // Only go into the bag if you are NOT holding anything
+    case plt::CookingZone_Bag:
+        if (player.holding_type == plt::PlayerHoldingType_None)
+            player.cooking_zone = plt::CookingZone_Bag;
+        break;
+
+    // Only go into the dishes cupboard if you are NOT holding anything
+    case plt::CookingZone_Dishes:
+        if (player.holding_type == plt::PlayerHoldingType_None)
+            player.cooking_zone = plt::CookingZone_Dishes;
+        break;
+
+    // Only go into the sink if you are holding an EMPTY bowl
+    case plt::CookingZone_Sink:
+        if (player.holding_type == plt::PlayerHoldingType_Dish)
+        {
+            flecs::entity dish = ecs_world->get_alive(player.item);
+            plt::Dish *dish_info = dish.get_mut<plt::Dish>();
+            if (dish_info->type == plt::DishType_Bowl && dish_info->fill == plt::BowlFillType_None)
+            {
+                player.cooking_zone = plt::CookingZone_Sink;
+            }
+        }
+        break;
+
+    // Only go into the cutting board menu if:
+    // Holding a Whole, non-cookable ingredient
+    case plt::CookingZone_CuttingBoard:
+        if (player.holding_type == plt::PlayerHoldingType_Ingredient)
+        {
+            flecs::entity ing_e = ecs_world->get_alive(player.item);
+            plt::Ingredient *ing_info = ing_e.get_mut<plt::Ingredient>();
+
+            if (!ing_info->cookable && ing_info->state == plt::Whole)
+            {
+                player.cooking_zone = plt::CookingZone_CuttingBoard;
+            }
+        }
+        break;
+
+    // Only go into the trash if you ARE holding something
+    case plt::CookingZone_Trash:
+        // If we're holding an item, throw it out
+        if (player.holding_type != plt::PlayerHoldingType_None)
+        {
+            ecs_world->get_alive(player.item).destruct();
+            player.holding_type = plt::PlayerHoldingType_None;
+        }
+        break;
+
+    default:
+        break;
     }
 }
 
@@ -432,8 +523,14 @@ void App::RenderSystem()
     // Main menu
     if (game_state == plt::GameState_MainMenu)
     {
-        if (GuiButton(Rectangle{screen_w * 0.25f, 100, screen_w - (screen_w * 0.5f), 50}, "PLAY"))
+        ClearBackground(Color{0x2B, 0x26, 0x27, 0xFF});
+
+        setGuiTextStyle(lookout_font, ColorToInt(WHITE), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+        if (GuiButton(Rectangle{screen_w * 0.25f, 250, screen_w - (screen_w * 0.5f), 50}, "PLAY"))
             game_state = plt::GameState_Day1Intro;
+
+        setGuiTextStyle(fear_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, lookout_font.baseSize, 90);
+        GuiLabel(Rectangle{0, 10, (float)screen_w, 250}, "AM I\nCooked??");
 
         EndDrawing();
         return;
@@ -450,7 +547,7 @@ void App::RenderSystem()
     render_orders.clear();
 
     //--------------------------------------------------------------------------------------
-    // Render Player
+    // Render Animated Player
     //--------------------------------------------------------------------------------------
     flecs::filter<plt::Position, plt::Player> player_f = ecs_world->filter<plt::Position, plt::Player>();
     player_f.each([&](flecs::entity e, plt::Position &pos, plt::Player &player)
@@ -504,30 +601,30 @@ void App::RenderSystem()
     // Render GUI
     //--------------------------------------------------------------------------------------
 
-    int j = 0;
-
-    for (auto &i : ingredients)
-    {
-        DrawTextureRec(meals_tex, {i.pos.x, i.pos.y, 32, 32}, {30, j * 2.f}, WHITE);
-        j++;
-    }
-
     flecs::filter<plt::Position, plt::Player> inv_f = ecs_world->filter<plt::Position, plt::Player>();
     inv_f.each([&](flecs::entity e, plt::Position &pos, plt::Player &player)
                {
                    switch (player.cooking_zone)
                    {
                    case plt::CookingZone_None:
+                       renderPlayerInventory(e, pos, player);
                        break;
                    case plt::CookingZone_Bag:
                        renderBagMenu(e, pos, player);
+                       break;
+                   case plt::CookingZone_Dishes:
+                       renderDishMenu(e, pos, player);
+                       break;
+                   case plt::CookingZone_Sink:
+                       renderSinkMenu(e, pos, player);
+                       break;
+                   case plt::CookingZone_CuttingBoard:
+                       renderCuttingBoardMenu(e, pos, player);
                        break;
 
                    default:
                        break;
                    }
-
-                   renderPlayerInventory(e, pos, player);
                    //
                });
 
@@ -605,40 +702,53 @@ void App::drawPulseRect(Rectangle pulse_rec)
 void App::renderPlayerInventory(flecs::entity e, plt::Position &pos, plt::Player &player)
 {
     // Draw Background Rectangle
-    DrawRectangleRec(Rectangle{374.f, 374.f, 128, 128}, ColorAlpha(WHITE, 0.4));
+    Rectangle inv_rect = Rectangle{screen_w - 110.f, screen_h - 110.f, 100, 100};
+    DrawRectangleRec(inv_rect, ColorAlpha(WHITE, 0.3));
 
-    if (!player.is_holding_item)
+    if (player.holding_type == plt::PlayerHoldingType_None)
         return;
 
+    // Get the item the player is holding
     flecs::entity item = ecs_world->get_alive(player.item);
 
-    // // Target Rectangle
-    // Rectangle target_rec = {384.f + 54, 384.f + 54, 108 * inv_scale.val, 108 * inv_scale.val};
-    // Vector2 origin = {target_rec.width / 2, target_rec.height / 2};
+    // Target Rectangle (within a margin of the inv_rect)
+    Rectangle target_rec = {inv_rect.x + 10.f, inv_rect.y + 10.f, inv_rect.width - 20.f, inv_rect.height - 20.f};
+    Vector2 origin = {target_rec.width / 2, target_rec.height / 2};
 
-    // switch (player.holding_state)
-    // {
-    // case plt::PlayerHoldState_SeedBag:
-    // {
-    //     plt::PlantBag *bag = item.get_mut<plt::PlantBag>();
-    //     DrawTexturePro(plants_tex, Rectangle{16.f * bag->plant_type, 0, 16, 16}, target_rec, origin, inv_rot.val, WHITE);
-    // }
-    // break;
-    // case plt::PlayerHoldState_Flower:
-    // {
-    //     plt::Plant *plant = item.get_mut<plt::Plant>();
-    //     DrawTexturePro(plants_tex, Rectangle{16.f * plant->plant_type, 16, 16, 16}, target_rec, origin, inv_rot.val, WHITE);
-    // }
-    // break;
+    // Switch based on what type of item we're holding
+    switch (player.holding_type)
+    {
+    // Render an ingredient item
+    case plt::PlayerHoldingType_Ingredient:
+    {
+        plt::Ingredient *item_ing = item.get_mut<plt::Ingredient>();
 
-    // default:
-    //     break;
-    // }
+        DrawTexturePro(meals_tex, {item_ing->pos.x, item_ing->pos.y + 32.f * item_ing->state, 32, 32}, target_rec, {0.f, 0.f}, 0, WHITE);
+    }
+    break;
+    // Render a dish item
+    case plt::PlayerHoldingType_Dish:
+    {
+        plt::Dish *item_ing = item.get_mut<plt::Dish>();
+
+        DrawTexturePro(meals_tex, {item_ing->pos.x, item_ing->pos.y, 32, 32}, target_rec, {0.f, 0.f}, 0, WHITE);
+
+        if (item_ing->fill != plt::BowlFillType_None)
+        {
+            int fill_int = ((int)item_ing->fill) - 1;
+            DrawTexturePro(meals_tex, {bowl_fills[fill_int].x, bowl_fills[fill_int].y, 32, 32}, target_rec, {0.f, 0.f}, 0, WHITE);
+        }
+    }
+    break;
+
+    default:
+        break;
+    }
 }
 
 void App::renderBagMenu(flecs::entity e, plt::Position &pos, plt::Player &player)
 {
-    // Draw menu background
+    // Menu background
     Rectangle menu_rec = Rectangle{10.f, 10.f, screen_w - 20.f, screen_h - 20.f};
     DrawRectangleRec(menu_rec, ColorAlpha(WHITE, 0.7));
 
@@ -648,9 +758,145 @@ void App::renderBagMenu(flecs::entity e, plt::Position &pos, plt::Player &player
     setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
     GuiLabel(Rectangle{menu_rec.x + 10, menu_rec.y + 10, menu_rec.width - 20.f, 30}, "Ingredients");
 
-    setGuiTextStyle(lookout_font, ColorToInt(WHITE), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 4, 30);
+    // Exit Button
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 4, 30);
     if (GuiButton(Rectangle{menu_rec.x + 10, menu_rec.y + 10, 100.f, 35}, "Exit"))
-    {
         player.cooking_zone = plt::CookingZone_None;
+
+    // Draw ingredient buttons
+    int i = 0;
+    for (auto ing : ingredients)
+    {
+        // Rectangle where this ingredient will be drawn
+        Rectangle ing_rec = {menu_rec.x + 10 + 66 * (i % 9), menu_rec.y + 70 + 66 * (i / 9), 64, 64};
+
+        if (GuiButton(ing_rec, ""))
+        {
+            flecs::entity ing_e = ecs_world->entity();
+            ing_e.set<plt::Ingredient>(ing);
+
+            player.holding_type = plt::PlayerHoldingType_Ingredient;
+            player.item = ing_e.id();
+            player.cooking_zone = plt::CookingZone_None;
+        }
+
+        DrawTexturePro(meals_tex, {ing.pos.x, ing.pos.y, 32, 32}, ing_rec, {0.f, 0.f}, 0, WHITE);
+        i++;
+    }
+}
+
+void App::renderDishMenu(flecs::entity e, plt::Position &pos, plt::Player &player)
+{
+    // Menu background
+    Rectangle menu_rec = Rectangle{10.f, 10.f, screen_w - 20.f, screen_h - 20.f};
+    DrawRectangleRec(menu_rec, ColorAlpha(WHITE, 0.7));
+
+    // Shop Title
+    setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+    GuiLabel(Rectangle{menu_rec.x + 10 + 1, menu_rec.y + 10 + 1, menu_rec.width - 20.f, 30}, "Dishes");
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+    GuiLabel(Rectangle{menu_rec.x + 10, menu_rec.y + 10, menu_rec.width - 20.f, 30}, "Dishes");
+
+    // Exit Button
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 4, 30);
+    if (GuiButton(Rectangle{menu_rec.x + 10, menu_rec.y + 10, 100.f, 35}, "Exit"))
+        player.cooking_zone = plt::CookingZone_None;
+
+    // Draw ingredient buttons
+    int i = 0;
+    for (auto dish : dishes)
+    {
+        // Rectangle where this ingredient will be drawn
+        Rectangle dish_rec = {menu_rec.x + 10 + 66 * (i % 9), menu_rec.y + 70 + 66 * (i / 9), 64, 64};
+
+        if (GuiButton(dish_rec, ""))
+        {
+            flecs::entity dish_e = ecs_world->entity();
+            dish_e.set<plt::Dish>(dish);
+
+            player.holding_type = plt::PlayerHoldingType_Dish;
+            player.item = dish_e.id();
+            player.cooking_zone = plt::CookingZone_None;
+        }
+
+        DrawTexturePro(meals_tex, {dish.pos.x, dish.pos.y, 32, 32}, dish_rec, {0.f, 0.f}, 0, WHITE);
+        i++;
+    }
+}
+
+void App::renderSinkMenu(flecs::entity e, plt::Position &pos, plt::Player &player)
+{
+    // Menu background
+    Rectangle menu_rec = Rectangle{10.f, 10.f, screen_w - 20.f, screen_h - 20.f};
+    DrawRectangleRec(menu_rec, ColorAlpha(WHITE, 0.7));
+
+    // Shop Title
+    setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+    GuiLabel(Rectangle{menu_rec.x + 10 + 1, menu_rec.y + 10 + 1, menu_rec.width - 20.f, 30}, "Fill Bowl");
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+    GuiLabel(Rectangle{menu_rec.x + 10, menu_rec.y + 10, menu_rec.width - 20.f, 30}, "Fill Bowl");
+
+    // Exit Button
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 4, 30);
+    if (GuiButton(Rectangle{menu_rec.x + 10, menu_rec.y + 10, 100.f, 35}, "Exit"))
+        player.cooking_zone = plt::CookingZone_None;
+
+    // Draw ingredient buttons
+    for (int i = 0; i < bowl_fills.size(); i++)
+    {
+        // Rectangle where this ingredient will be drawn
+        Rectangle fill_rec = {menu_rec.x + 10 + 66 * (i % 9), menu_rec.y + 70 + 66 * (i / 9), 64, 64};
+
+        if (GuiButton(fill_rec, ""))
+        {
+            flecs::entity dish = ecs_world->get_alive(player.item);
+            plt::Dish *dish_info = dish.get_mut<plt::Dish>();
+            dish_info->fill = (plt::BowlFillType)(i + 1);
+
+            player.cooking_zone = plt::CookingZone_None;
+        }
+
+        DrawTexturePro(meals_tex, {bowl_fills[i].x, bowl_fills[i].y, 32, 32}, fill_rec, {0.f, 0.f}, 0, WHITE);
+    }
+}
+
+void App::renderCuttingBoardMenu(flecs::entity e, plt::Position &pos, plt::Player &player)
+{
+    // Menu background
+    Rectangle menu_rec = Rectangle{10.f, 10.f, screen_w - 20.f, screen_h - 20.f};
+    DrawRectangleRec(menu_rec, ColorAlpha(WHITE, 0.7));
+
+    // Shop Title
+    setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+    GuiLabel(Rectangle{menu_rec.x + 10 + 1, menu_rec.y + 10 + 1, menu_rec.width - 20.f, 30}, "Cutting Board");
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+    GuiLabel(Rectangle{menu_rec.x + 10, menu_rec.y + 10, menu_rec.width - 20.f, 30}, "Cutting Board");
+
+    // Exit Button
+    setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 4, 30);
+    if (GuiButton(Rectangle{menu_rec.x + 10, menu_rec.y + 10, 100.f, 35}, "Exit"))
+        player.cooking_zone = plt::CookingZone_None;
+
+    flecs::entity ing_e = ecs_world->get_alive(player.item);
+    plt::Ingredient *ing_info = ing_e.get_mut<plt::Ingredient>();
+
+    std::vector<std::string> cut_names = {"Left Cut", "Right Cut", "Middle Cut"};
+
+    // Draw Cutting Options
+    for (int i = plt::LeftPile; i < plt::SingleKebab; i++)
+    {
+        // Rectangle where this ingredient will be drawn
+        Rectangle fill_rec = {menu_rec.x + 10, menu_rec.y + 90 + 70 * (i - 1), 64, 64};
+
+        setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_LEFT, TEXT_ALIGN_MIDDLE, lookout_font.baseSize / 3, 30);
+        GuiLabel({fill_rec.x + 80, fill_rec.y, 200, 64}, cut_names[i - 1].c_str());
+
+        if (GuiButton(fill_rec, ""))
+        {
+            ing_info->state = (plt::IngredientState)i;
+            player.cooking_zone = plt::CookingZone_None;
+        }
+
+        DrawTexturePro(meals_tex, {ing_info->pos.x, ing_info->pos.y + 32.f * i, 32, 32}, fill_rec, {0.f, 0.f}, 0, WHITE);
     }
 }

@@ -30,6 +30,7 @@ private:
     // Fonts
     //--------------------------------------------------------------------------------------
     Font lookout_font;
+    Font fear_font;
     //--------------------------------------------------------------------------------------
 
     // Textures
@@ -40,6 +41,8 @@ private:
     // Food Texture
     Texture2D meals_tex;
     //--------------------------------------------------------------------------------------
+
+    plt::Meal current_meal;
 
     // Audio
     //--------------------------------------------------------------------------------------
@@ -59,9 +62,15 @@ private:
 
     // List of available ingredients
     std::vector<plt::Ingredient> ingredients;
+    std::vector<plt::Dish> dishes;
+    std::vector<Vector2> bowl_fills;
+
     void initFood();
 
     void renderBagMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
+    void renderDishMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
+    void renderSinkMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
+    void renderCuttingBoardMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
     void renderPlayerInventory(flecs::entity e, plt::Position &pos, plt::Player &player);
 
     // ECS

@@ -22,10 +22,12 @@ private:
 
     // Map portion drawn behind everything else
     RenderTexture2D map_target;
+    RenderTexture2D map_target_front;
 
 public:
     Map(flecs::world *ecs_world);
     ~Map();
 
     void draw();
+    void drawFront();
 };
