@@ -24,10 +24,8 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screen_w = 960;
-    const int screen_h = 640;
-
-    InitAudioDevice();
+    const int screen_w = 20*32;
+    const int screen_h = 12*32;
 
     // Set antialiasing
     SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -43,7 +41,7 @@ int main(void)
 
     // Set the emscripten main loop
     emscripten_set_main_loop(updateAndDraw, 0, 1);
-    //--------------------------------------------------------------------------------------
+    //-------------------------------------------------------------------------------------- 
  
     // De-Initialization
     //--------------------------------------------------------------------------------------

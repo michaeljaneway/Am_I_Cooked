@@ -15,17 +15,25 @@ private:
     bool render_colliders;
     bool render_positions;
 
+    bool is_audio_initialized;
+
+    plt::GameState game_state;
+
     // Textures
     //--------------------------------------------------------------------------------------
 
-    // Player Forwards
-    Texture2D player_fwd_tex;
-    // Player Backwards
-    Texture2D player_bck_tex;
-    // Player Left
-    Texture2D player_l_tex;
-    // Player Right
-    Texture2D player_r_tex;
+    // Ghost Player Texture
+    Texture2D player_tex;
+    //--------------------------------------------------------------------------------------
+
+    // Audio
+    //--------------------------------------------------------------------------------------
+
+    std::vector< Music> game_music;
+
+    void handleGameMusic();
+
+    void playGameMusic(Music &mus);
 
     //--------------------------------------------------------------------------------------
 

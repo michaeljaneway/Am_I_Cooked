@@ -66,6 +66,6 @@ if (${PLATFORM} STREQUAL "Web")
     # Map assets to root of .data file
     set(ASSETS_DIR "${CMAKE_SOURCE_DIR}/assets/@/")
 
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH --preload-file \"${ASSETS_DIR}\"")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH -sTOTAL_STACK=128MB -sSTACK_SIZE=32MB -sINITIAL_MEMORY=64MB --preload-file \"${ASSETS_DIR}\"")
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
 endif()

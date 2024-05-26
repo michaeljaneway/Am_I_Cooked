@@ -36,7 +36,6 @@ namespace plt
     //--------------------------------------------------------------------------------------
     enum PlayerMvnmtState : uint8_t
     {
-        PlayerMvnmtState_Idle,
         PlayerMvnmtState_Left,
         PlayerMvnmtState_Right,
         PlayerMvnmtState_Back,
@@ -72,6 +71,31 @@ namespace plt
         int money;
     };
 
+    //--------------------------------------------------------------------------------------
+    // Game State
+    //--------------------------------------------------------------------------------------
+
+    enum GameState
+    {
+        GameState_MainMenu,
+        GameState_Day1Intro,
+        GameState_Day1,
+        GameState_Day2Intro,
+        GameState_Day2,
+        GameState_Day3Intro,
+        GameState_Day3,
+        GameState_Outro,
+    };
+
+    enum GameMusic: uint8_t
+    {
+        GameMusic_MainMenu,
+        GameMusic_Day1,
+        GameMusic_Day2,
+        GameMusic_Day3,
+        GameMusic_Devil,
+        GameMusic_Ascension,
+    };
 
     //--------------------------------------------------------------------------------------
     // Sprite Render Order (or Instruction) (for y-level rendering)

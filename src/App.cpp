@@ -13,12 +13,16 @@ App::App(int screen_w, int screen_h)
     render_colliders = false;
     render_positions = false;
 
+    is_audio_initialized = false;
+
     // Load Font (https://ggbot.itch.io/kaph-font)
     // kaph_font = LoadFontEx("Kaph-Regular.ttf", 128, 0, 250);
 
     inv_rot = {0.0, 20, 20, true, -1, 1, EaseInOutCubic};
     inv_scale = {0.0, 40, 40, true, 0.95, 1, EaseInOutCubic};
     text_y_add = {0.0, 5, 5, true, 0, 10, EaseInOutCubic};
+
+    game_state = plt::GameState_MainMenu;
 
     // ==================================================
     // Initialize ECS World
@@ -36,39 +40,21 @@ App::App(int screen_w, int screen_h)
     // ==================================================
 
     // ==================================================
-    // Load the player textures
+    // Load the player texture
     // ==================================================
-
-    // Load fwd walking
     {
-        Image walking_front_img = LoadImage("character_walking_front.png");
-        player_fwd_tex = LoadTextureFromImage(walking_front_img);
-        UnloadImage(walking_front_img);
-    }
-
-    // Load l and r from the same file
-    {
-        Image walking_lr_img = LoadImage("character_walking_side.png");
-        player_r_tex = LoadTextureFromImage(walking_lr_img);
-        ImageFlipHorizontal(&walking_lr_img);
-        player_l_tex = LoadTextureFromImage(walking_lr_img);
-        UnloadImage(walking_lr_img);
-    }
-
-    // Load back walking
-    {
-        Image walking_back_img = LoadImage("character_walking_back.png");
-        player_bck_tex = LoadTextureFromImage(walking_back_img);
-        UnloadImage(walking_back_img);
+        Image player_img = LoadImage("chef_ghost_strip.png");
+        player_tex = LoadTextureFromImage(player_img);
+        UnloadImage(player_img);
     }
 }
 
 App::~App()
 {
-    UnloadTexture(player_fwd_tex);
-    UnloadTexture(player_l_tex);
-    UnloadTexture(player_r_tex);
-    UnloadTexture(player_bck_tex);
+    UnloadTexture(player_tex);
+
+    for (auto &track : game_music)
+        UnloadMusicStream(track);
 }
 
 void App::initSystems()
@@ -127,7 +113,6 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
 
     Vector2 dist = {0, 0};
     plt::PlayerMvnmtState prev_move_state = player.move_state;
-    player.move_state = plt::PlayerMvnmtState_Idle;
 
     if (IsKeyDown(KeyboardKey::KEY_S))
     {
@@ -157,20 +142,12 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
     pos.x = dist.x;
     pos.y = dist.y;
 
-    if (player.move_state == plt::PlayerMvnmtState_Idle || player.move_state != prev_move_state)
-    {
-        player.current_frame = 0;
-        player.time_till_fchange = player.time_per_fchange;
-    }
-    else
-    {
-        player.time_till_fchange -= ecs_world->delta_time();
+    player.time_till_fchange -= ecs_world->delta_time();
 
-        if (player.time_till_fchange <= 0)
-        {
-            player.current_frame = (player.current_frame + 1) % 6;
-            player.time_till_fchange = player.time_per_fchange;
-        }
+    if (player.time_till_fchange <= 0)
+    {
+        player.current_frame = (player.current_frame + 1) % 4;
+        player.time_till_fchange = player.time_per_fchange;
     }
 
     //--------------------------------------------------------------------------------------
@@ -179,7 +156,6 @@ void App::PlayerSystem(flecs::entity e, plt::Position &pos, plt::Player &player)
 
     if (player.is_holding_item)
     {
-
     }
 }
 
@@ -245,16 +221,104 @@ void processLoopingEase(plt::LoopingEase &le, float dt)
         le.val = Lerp(le.max_val, le.min_val, progress);
 }
 
+void App::handleGameMusic()
+{
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !is_audio_initialized)
+    {
+        is_audio_initialized = true;
+        InitAudioDevice();
+
+        // Add the music
+        game_music.push_back(LoadMusicStream("music/jazzfunk.mp3"));
+        game_music.push_back(LoadMusicStream("music/nokia.mp3"));
+        game_music.push_back(LoadMusicStream("music/dance1.mp3"));
+        game_music.push_back(LoadMusicStream("music/churchcombat.mp3"));
+        game_music.push_back(LoadMusicStream("music/devil.mp3"));
+        game_music.push_back(LoadMusicStream("music/New Sunrise.mp3"));
+    }
+
+    switch (game_state)
+    {
+    case plt::GameState_MainMenu:
+        playGameMusic(game_music[plt::GameMusic_MainMenu]);
+        break;
+
+    case plt::GameState_Day1Intro:
+    case plt::GameState_Day2Intro:
+    case plt::GameState_Day3Intro:
+        playGameMusic(game_music[plt::GameMusic_Devil]);
+        break;
+
+    case plt::GameState_Day1:
+        playGameMusic(game_music[plt::GameMusic_Day1]);
+        break;
+
+    case plt::GameState_Day2:
+        playGameMusic(game_music[plt::GameMusic_Day2]);
+        break;
+
+    case plt::GameState_Day3:
+        playGameMusic(game_music[plt::GameMusic_Day3]);
+        break;
+
+    case plt::GameState_Outro:
+        playGameMusic(game_music[plt::GameMusic_Ascension]);
+        break;
+
+    default:
+        break;
+    }
+}
+
+void App::playGameMusic(Music &mus)
+{
+    // Return if the audio device is not ready
+    if (!IsAudioDeviceReady())
+    {
+        return;
+    }
+
+    if (!IsMusicStreamPlaying(mus))
+    {
+        // Pause the playing music track
+        for (auto &track : game_music)
+            if (IsMusicStreamPlaying(track))
+                StopMusicStream(track);
+
+        // Start playing the new song
+        PlayMusicStream(mus);
+    }
+    else
+    {
+        UpdateMusicStream(mus);
+    }
+}
+
 void App::RenderSystem()
 {
+    // Speedrun time counter
+    time_counter += ecs_world->delta_time();
+
     processLoopingEase(inv_rot, ecs_world->delta_time());
     processLoopingEase(inv_scale, ecs_world->delta_time());
     processLoopingEase(text_y_add, ecs_world->delta_time());
 
-    time_counter += ecs_world->delta_time();
+    // Handle music
+    handleGameMusic();
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
+
+    if (game_state == plt::GameState_MainMenu)
+    {
+        if (GuiButton(Rectangle{screen_w * 0.1f, 300, screen_w - (screen_w * 0.2f), 300}, "PLAY"))
+        {
+            game_state = plt::GameState_Day1Intro;
+        }
+
+        EndDrawing();
+        return;
+    }
 
     //--------------------------------------------------------------------------------------
     // Render Map
@@ -265,8 +329,6 @@ void App::RenderSystem()
     // Clear previous frame render orders
     //--------------------------------------------------------------------------------------
     render_orders.clear();
-
-    // GuiLabel(Rectangle{0, 0, 512, 200}, std::to_string(time_counter).c_str());
 
     //--------------------------------------------------------------------------------------
     // Render Player
@@ -283,25 +345,24 @@ void App::RenderSystem()
                           DrawRectangleRec(highlight_rect, ColorAlpha(WHITE, 0.3));
                       }
 
-                      // Subtract a bit more than 32 from y so sprite is a bit above the collidersa
-                      Vector2 draw_pos = {round(pos.x - 40), round(pos.y - 32 - 11)};
+                      // Subtract a bit more than 32 from y so sprite is a bit above the colliders
+                      Vector2 draw_pos = {round(pos.x - 16), round(pos.y - 32)};
+
+                      const Color ghost_color = ColorAlpha(WHITE, 0.8);
 
                       switch (player.move_state)
                       {
-                      case plt::PlayerMvnmtState_Idle:
-                          render_orders.push_back({pos.y, player_fwd_tex, Rectangle{0, 0, 80, 64}, draw_pos, WHITE});
-                          break;
                       case plt::PlayerMvnmtState_Left:
-                          render_orders.push_back({pos.y, player_l_tex, Rectangle{80.f * player.current_frame, 0, 80, 64}, draw_pos, WHITE});
+                          render_orders.push_back({pos.y, player_tex, Rectangle{32.f * (player.current_frame + 12), 0, 32, 32}, draw_pos, ghost_color});
                           break;
                       case plt::PlayerMvnmtState_Right:
-                          render_orders.push_back({pos.y, player_r_tex, Rectangle{80.f * player.current_frame, 0, 80, 64}, draw_pos, WHITE});
+                          render_orders.push_back({pos.y, player_tex, Rectangle{32.f * (player.current_frame + 4), 0, 32, 32}, draw_pos, ghost_color});
                           break;
                       case plt::PlayerMvnmtState_Back:
-                          render_orders.push_back({pos.y, player_bck_tex, Rectangle{80.f * player.current_frame, 0, 80, 64}, draw_pos, WHITE});
+                          render_orders.push_back({pos.y, player_tex, Rectangle{32.f * (player.current_frame + 8), 0, 32, 32}, draw_pos, ghost_color});
                           break;
                       case plt::PlayerMvnmtState_Forward:
-                          render_orders.push_back({pos.y, player_fwd_tex, Rectangle{80.f * player.current_frame, 0, 80, 64}, draw_pos, WHITE});
+                          render_orders.push_back({pos.y, player_tex, Rectangle{32.f * player.current_frame, 0, 32, 32}, draw_pos, ghost_color});
                           break;
                       default:
                           break;
@@ -328,16 +389,16 @@ void App::RenderSystem()
     // Render Tutorial
     //--------------------------------------------------------------------------------------
 
-
     //--------------------------------------------------------------------------------------
     //
     // DEBUG RENDER SETTINGS
     //
     //--------------------------------------------------------------------------------------
 
-    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
+    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(BLACK));
     GuiToggle(Rectangle{screen_w - 10.f - 100, 10, 100, 20}, "Render Colliders", &render_colliders);
     GuiToggle(Rectangle{screen_w - 10.f - 100, 40, 100, 20}, "Render Positions", &render_positions);
+    GuiSpinner(Rectangle{screen_w - 10.f - 100, 70, 100, 20}, "", (int *)&game_state, 0, (int)plt::GameState_Outro, false);
 
     //--------------------------------------------------------------------------------------
     // Render Colliders (DEBUG)

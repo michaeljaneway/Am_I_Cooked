@@ -133,7 +133,7 @@ Map::Map(flecs::world *ecs_world)
                     {
                         flecs::entity player_e = ecs_world->entity();
                         player_e.set<plt::Position>({layer_obj->x, layer_obj->y});
-                        player_e.set<plt::Player>({false, plt::PlayerMvnmtState_Idle, 0, 0.1, 0.3, 0, flecs::Empty, false, false, 0});
+                        player_e.set<plt::Player>({false, plt::PlayerMvnmtState_Forward, 0, 0.1, 0.3, 0, flecs::Empty, false, false, 0});
                         player_e.set<plt::Collider>({Rectangle{-7, -2, 14, 8}, c2AABB{0, 0, 0, 0}});
                         player_e.set<plt::DynamicBody>({1});
                     }
