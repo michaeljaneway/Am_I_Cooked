@@ -18,8 +18,11 @@ Map::Map(flecs::world *ecs_world)
     cute_tiled_tileset_t *ts_ptr = map->tilesets;
     while (ts_ptr)
     {
+        // Get the tileset image's path
+        std::filesystem::path ts_path(ts_ptr->image.ptr);
+
         // Load tileset's image
-        Image ts_img = LoadImage(ts_ptr->image.ptr);
+        Image ts_img = LoadImage(ts_path.filename().string().c_str());
         TilesetInfo ts_info;
         ts_info.info = *ts_ptr;
 
@@ -133,9 +136,39 @@ Map::Map(flecs::world *ecs_world)
                     {
                         flecs::entity player_e = ecs_world->entity();
                         player_e.set<plt::Position>({layer_obj->x, layer_obj->y});
-                        player_e.set<plt::Player>({false, plt::PlayerMvnmtState_Forward, 0, 0.1, 0.3, 0, flecs::Empty, false, false, 0});
+                        player_e.set<plt::Player>({false, plt::PlayerMvnmtState_Forward, 0, 0.1, 0.3, 0, flecs::Empty, false, plt::CookingZone_None});
                         player_e.set<plt::Collider>({Rectangle{-7, -2, 14, 8}, c2AABB{0, 0, 0, 0}});
                         player_e.set<plt::DynamicBody>({1});
+                    }
+                    else if (std::string("Bag") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_Bag, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
+                    }
+                    else if (std::string("Dishes") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_Dishes, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
+                    }
+                    else if (std::string("Sink") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_Sink, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
+                    }
+                    else if (std::string("CuttingBoard") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_CuttingBoard, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
+                    }
+                    else if (std::string("Stove") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_Stove, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
+                    }
+                    else if (std::string("Trash") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_Trash, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
                     }
 
                     layer_obj = layer_obj->next;
@@ -159,5 +192,5 @@ Map::~Map()
 
 void Map::draw()
 {
-    DrawTextureRec(map_target.texture, (Rectangle){0, 0, (float)map_target.texture.width, (float)-map_target.texture.height}, Vector2{0, 0}, WHITE);
+    DrawTextureRec(map_target.texture, Rectangle{0, 0, (float)map_target.texture.width, (float)-map_target.texture.height}, Vector2{0, 0}, WHITE);
 }

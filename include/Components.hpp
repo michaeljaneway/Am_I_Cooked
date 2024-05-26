@@ -4,6 +4,59 @@
 namespace plt
 {
     //--------------------------------------------------------------------------------------
+    // Cooking Zones
+    //--------------------------------------------------------------------------------------
+
+    enum CookingZoneType
+    {
+        CookingZone_None,
+        CookingZone_Bag,
+        CookingZone_Dishes,
+        CookingZone_Sink,
+        CookingZone_CuttingBoard,
+        CookingZone_Stove,
+        CookingZone_Trash
+    };
+
+    struct CookingZone
+    {
+        CookingZoneType type;
+        Rectangle zone;
+    };
+
+    //--------------------------------------------------------------------------------------
+    // Food Order
+    //--------------------------------------------------------------------------------------
+
+    enum DishType
+    {
+        Plate,
+        Bowl,
+        PlateAndKebab
+    };
+
+    enum IngredientState
+    {
+        Whole, // RAW
+        LeftPile,
+        CenterPile,
+        RightPile,
+        SingleKebab,
+        ThreeKebabs,
+        TopKebab,
+        MiddleKebab,
+        BottomKebab
+    };
+
+    struct Ingredient
+    {
+        std::string name;
+        Vector2 pos;
+        bool cookable;
+        IngredientState state;
+    };
+
+    //--------------------------------------------------------------------------------------
     // Entity position and rotation (in degrees)
     //--------------------------------------------------------------------------------------
     struct Position
@@ -52,7 +105,7 @@ namespace plt
 
         // Set time per frame change
         float time_per_fchange;
- 
+
         // Time till next frame change
         float time_till_fchange;
 
@@ -61,14 +114,11 @@ namespace plt
         // Item the player is holding
         flecs::entity_t item;
 
-        // The type of item the player is holding
+        // Is the player holding an item
         bool is_holding_item;
 
-        // Is the player in the buy menu
-        bool in_buy_menu;
-
-        // Player's money
-        int money;
+        // Interacting with cooking zone
+        CookingZoneType cooking_zone;
     };
 
     //--------------------------------------------------------------------------------------
@@ -87,7 +137,7 @@ namespace plt
         GameState_Outro,
     };
 
-    enum GameMusic: uint8_t
+    enum GameMusic : uint8_t
     {
         GameMusic_MainMenu,
         GameMusic_Day1,

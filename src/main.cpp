@@ -24,8 +24,8 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screen_w = 20*32;
-    const int screen_h = 12*32;
+    const int screen_w = 640;
+    const int screen_h = 384;
 
     // Set antialiasing
     SetConfigFlags(FLAG_MSAA_4X_HINT);

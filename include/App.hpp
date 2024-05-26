@@ -7,34 +7,46 @@ private:
     int screen_w;
     int screen_h;
 
+    // World Values
     std::unique_ptr<flecs::world> ecs_world;
     std::unique_ptr<Map> map;
 
+    // Counter for speedrunning
     float time_counter;
 
+    // Debug GUI Values
     bool render_colliders;
     bool render_positions;
 
+    // Audio Values
     bool is_audio_initialized;
 
+    // Gamestate Values
     plt::GameState game_state;
+    plt::GameState prev_game_state;
+
+    // Customer Values
+
+    // Fonts
+    //--------------------------------------------------------------------------------------
+    Font lookout_font;
+    //--------------------------------------------------------------------------------------
 
     // Textures
     //--------------------------------------------------------------------------------------
-
-    // Ghost Player Texture
+    // Player Texture
     Texture2D player_tex;
+
+    // Food Texture
+    Texture2D meals_tex;
     //--------------------------------------------------------------------------------------
 
     // Audio
     //--------------------------------------------------------------------------------------
-
-    std::vector< Music> game_music;
+    std::vector<Music> game_music;
 
     void handleGameMusic();
-
     void playGameMusic(Music &mus);
-
     //--------------------------------------------------------------------------------------
 
     // Used to give style to inventory item
@@ -44,6 +56,13 @@ private:
 
     // Vector of sprites to be rendered, sorted by y-values
     std::vector<plt::SPR> render_orders;
+
+    // List of available ingredients
+    std::vector<plt::Ingredient> ingredients;
+    void initFood();
+
+    void renderBagMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
+    void renderPlayerInventory(flecs::entity e, plt::Position &pos, plt::Player &player);
 
     // ECS
     //--------------------------------------------------------------------------------------
@@ -59,6 +78,9 @@ private:
 
     // Handle collisions for dynamic bodies
     void DynamicBodySystem(flecs::entity e, plt::Position &pos, plt::Collider &coll);
+
+    // Handle Customers and Orders
+    void CustomerSystem();
 
     // Render the world after all updates
     void RenderSystem();

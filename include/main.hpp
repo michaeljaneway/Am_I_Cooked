@@ -23,6 +23,7 @@
 #include <memory>
 #include <stdio.h>
 #include <map>
+#include <filesystem>
 
 // Graphics
 #include "raylib.h"
