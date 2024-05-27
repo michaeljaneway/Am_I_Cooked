@@ -368,6 +368,12 @@ App::App(int screen_w, int screen_h)
         devil_tex = LoadTextureFromImage(devil_img);
         UnloadImage(devil_img);
     }
+    // Load the outro texture
+    {
+        Image outro_img = LoadImage("not_cooked.png");
+        outro_tex = LoadTextureFromImage(outro_img);
+        UnloadImage(outro_img);
+    }
 
     initFood();
 }
@@ -491,7 +497,7 @@ void App::initFood()
 
     Day1Dialogue.push_back("Let's get cookin'");
     Day1Dialogue.push_back("Capice??");
-    Day1Dialogue.push_back("Do this three times and you go to\nHEAVEN");
+    Day1Dialogue.push_back("Do this for three shifts and you go\nto HEAVEN");
     Day1Dialogue.push_back("Plate each item on the countertop\nbetween the two vases");
     Day1Dialogue.push_back("Throw out misclicks and failures\nin the trash bin");
     Day1Dialogue.push_back("Use the stove to prepare meat");
@@ -500,7 +506,7 @@ void App::initFood()
     Day1Dialogue.push_back("Plates and Bowls are in the cabinet");
     Day1Dialogue.push_back("All the ingredients are in the bag\non the far left");
     Day1Dialogue.push_back("You will fill out that recipe top\nto bottom IN ORDER");
-    Day1Dialogue.push_back("A customer will come in and give\nyou a recipe");
+    Day1Dialogue.push_back("Customers will come in and give\nyou recipies");
     Day1Dialogue.push_back("Let me give you the run down");
     Day1Dialogue.push_back("If you want to get out,\nyou're gonna have to cook");
     Day1Dialogue.push_back("I'm your most famous HOST:\nLucifer Morningstar");
@@ -711,13 +717,13 @@ void App::CustomerSystem()
         switch (game_state)
         {
         case plt::GameState_Day1:
-            addRandomCustomers(5, 2);
+            addRandomCustomers(4, 2); // 4, 2
             break;
         case plt::GameState_Day2:
-            addRandomCustomers(8, 3);
+            addRandomCustomers(6, 3); // 6, 3
             break;
         case plt::GameState_Day3:
-            addRandomCustomers(10, 5);
+            addRandomCustomers(6, 5); // 6, 5
             break;
         default:
             break;
@@ -842,7 +848,10 @@ void App::handleGameMusic()
         game_music.push_back(LoadMusicStream("music/nokia.mp3"));
         game_music.push_back(LoadMusicStream("music/dance1.mp3"));
         game_music.push_back(LoadMusicStream("music/churchcombat.mp3"));
+
         game_music.push_back(LoadMusicStream("music/devil.mp3"));
+        SetMusicVolume(game_music.back(), 0.7);
+
         game_music.push_back(LoadMusicStream("music/New Sunrise.mp3"));
     }
 
@@ -883,9 +892,7 @@ void App::playGameMusic(Music &mus)
 {
     // Return if the audio device is not ready
     if (!IsAudioDeviceReady())
-    {
         return;
-    }
 
     if (!IsMusicStreamPlaying(mus))
     {
@@ -921,7 +928,7 @@ void App::RenderSystem()
     }
 
     // Handle music
-    // handleGameMusic();
+    handleGameMusic();
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
@@ -935,7 +942,7 @@ void App::RenderSystem()
         if (GuiButton(Rectangle{screen_w * 0.25f, 250, screen_w - (screen_w * 0.5f), 50}, "PLAY"))
             game_state = plt::GameState_Day1Intro;
 
-        DrawTextureRec(logo_tex, {0, 0, (float)logo_tex.width, (float)logo_tex.height}, {screen_w / 2 - (float)logo_tex.width / 2 + 1, 50 + 1}, BLACK);
+        // DrawTextureRec(logo_tex, {0, 0, (float)logo_tex.width, (float)logo_tex.height}, {screen_w / 2 - (float)logo_tex.width / 2 + 1, 50 + 1}, BLACK);
         DrawTextureRec(logo_tex, {0, 0, (float)logo_tex.width, (float)logo_tex.height}, {screen_w / 2 - (float)logo_tex.width / 2, 50}, WHITE);
 
         EndDrawing();
@@ -943,7 +950,7 @@ void App::RenderSystem()
     }
     else if (game_state == plt::GameState_Outro)
     {
-        ClearBackground(Color{0x2B, 0x26, 0x27, 0xFF});
+        DrawTexture(outro_tex, 0, 0, WHITE);
 
         setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, 80, 50);
         GuiLabel(Rectangle{0 + 2, 10 + 2, (float)screen_w, 250}, "You Have Ascended\nTo Heaven");
@@ -955,7 +962,7 @@ void App::RenderSystem()
 
         setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, 35, 30);
         GuiLabel({0 + 2, screen_h - 100.f + 2, (float)screen_w, 40}, ("Time: " + speedrun_stream.str()).c_str());
-        setGuiTextStyle(lookout_font, ColorToInt(WHITE), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, 35, 30);
+        setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, 35, 30);
         GuiLabel({0, screen_h - 100.f, (float)screen_w, 40}, ("Time: " + speedrun_stream.str()).c_str());
 
         EndDrawing();
@@ -1374,7 +1381,7 @@ void App::renderDishMenu(flecs::entity e, plt::Position &pos, plt::Player &playe
     for (auto dish : dishes)
     {
         // Rectangle where this ingredient will be drawn
-        Rectangle dish_rec = {menu_rec.x + 10 + 66 * (i % 9), menu_rec.y + 70 + 66 * (i / 9), 64, 64};
+        Rectangle dish_rec = {menu_rec.x + 25 + 276 * i, menu_rec.y + 70, 256, 256};
 
         if (GuiButton(dish_rec, ""))
         {
@@ -1385,6 +1392,11 @@ void App::renderDishMenu(flecs::entity e, plt::Position &pos, plt::Player &playe
             player.item = dish_e.id();
             player.cooking_zone = plt::CookingZone_None;
         }
+
+        setGuiTextStyle(lookout_font, ColorToInt(BLACK), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, 23, 17);
+        GuiLabel({dish_rec.x + 1, dish_rec.y + dish_rec.height + 1, dish_rec.width, 40}, dish.name.c_str());
+        setGuiTextStyle(lookout_font, ColorToInt(RED), TEXT_ALIGN_CENTER, TEXT_ALIGN_MIDDLE, 23, 17);
+        GuiLabel({dish_rec.x, dish_rec.y + dish_rec.height, dish_rec.width, 40}, dish.name.c_str());
 
         DrawTexturePro(meals_tex, {dish.pos.x, dish.pos.y, 32, 32}, dish_rec, {0.f, 0.f}, 0, WHITE);
         i++;

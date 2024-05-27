@@ -58,6 +58,9 @@ private:
     
     // Devil Texture
     Texture2D devil_tex;
+
+    // Outro Texture
+    Texture2D outro_tex;
     //--------------------------------------------------------------------------------------
 
     // Audio
