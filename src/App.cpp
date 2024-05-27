@@ -711,13 +711,13 @@ void App::CustomerSystem()
         switch (game_state)
         {
         case plt::GameState_Day1:
-            addRandomCustomers(0, 2);
+            addRandomCustomers(5, 2);
             break;
         case plt::GameState_Day2:
-            addRandomCustomers(0, 3);
+            addRandomCustomers(8, 3);
             break;
         case plt::GameState_Day3:
-            addRandomCustomers(0, 4);
+            addRandomCustomers(10, 5);
             break;
         default:
             break;
