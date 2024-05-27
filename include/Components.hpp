@@ -15,7 +15,8 @@ namespace plt
         CookingZone_Sink,
         CookingZone_CuttingBoard,
         CookingZone_Stove,
-        CookingZone_Trash
+        CookingZone_Trash,
+        CookingZone_Plating
     };
 
     struct CookingZone
@@ -81,7 +82,9 @@ namespace plt
         // Pair where:
         // - First: 0 for dishes, 1 for ingredients
         // - Second: Index in the respective list
-        std::vector<std::pair<int,int>> indicies;
+        std::vector<std::pair<int, int>> indicies;
+
+        int completion;
     };
 
     //--------------------------------------------------------------------------------------
@@ -110,6 +113,14 @@ namespace plt
     struct DynamicBody
     {
         int i;
+    };
+
+    struct Devil
+    {
+        int frame;
+        int total_frames;
+        float last_switch;
+        float time_to_switch;
     };
 
     //--------------------------------------------------------------------------------------
@@ -154,6 +165,41 @@ namespace plt
 
         // Interacting with cooking zone
         CookingZoneType cooking_zone;
+    };
+
+    //--------------------------------------------------------------------------------------
+    // Customers
+    //--------------------------------------------------------------------------------------
+
+    enum CustomerType
+    {
+        CustomerType_Big,
+        CustomerType_Thin,
+        CustomerType_Built
+    };
+
+    enum CustomerFacing
+    {
+        CustomerFacing_Fwd,
+        CustomerFacing_Left
+    };
+
+    enum CustomerState
+    {
+        CustomerState_InLine,
+        CustomerState_GettingFood,
+        CustomerState_Leaving,
+    };
+
+    struct Customer
+    {
+        CustomerType type;
+        CustomerState state;
+        CustomerFacing facing;
+        Order order;
+        Color col;
+
+        Vector2 pos;
     };
 
     //--------------------------------------------------------------------------------------

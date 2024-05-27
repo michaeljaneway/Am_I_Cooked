@@ -24,6 +24,9 @@
 #include <stdio.h>
 #include <map>
 #include <filesystem>
+#include <random>
+#include <sstream>
+#include <queue>
 
 // Graphics
 #include "raylib.h"

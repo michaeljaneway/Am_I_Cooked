@@ -27,8 +27,10 @@ int main(void)
     const int screen_w = 640;
     const int screen_h = 384;
 
+    srand(time(NULL));
+
     // Set antialiasing
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    // SetConfigFlags(FLAG_MSAA_4X_HINT);
 
     // Init window and framerate
     InitWindow(screen_w, screen_h, "SpeedJam5");

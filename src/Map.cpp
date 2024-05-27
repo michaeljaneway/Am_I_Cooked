@@ -50,6 +50,7 @@ Map::Map(flecs::world *ecs_world)
     // Initialize map rendertarget
     //--------------------------------------------------------------------------------------
     map_target = LoadRenderTexture(map_w * tile_w, map_h * tile_h);
+    map_target_front = LoadRenderTexture(map_w * tile_w, map_h * tile_h);
 
     //--------------------------------------------------------------------------------------
     // Render map layers to RenderTexture
@@ -93,8 +94,12 @@ Map::Map(flecs::world *ecs_world)
                                           (float)tile_h};
 
                     Vector2 dest_pos = {(float)column * tile_w, (float)row * tile_h};
+                    
+                    if (std::string("frontlayer") == layer->class_.ptr)
+                        BeginTextureMode(map_target_front);
+                    else
+                        BeginTextureMode(map_target);
 
-                    BeginTextureMode(map_target);
                     DrawTextureRec(this_tile_info->tex, src_rect, dest_pos, WHITE);
                     EndTextureMode();
                 }
@@ -170,6 +175,11 @@ Map::Map(flecs::world *ecs_world)
                         flecs::entity zone_e = ecs_world->entity();
                         zone_e.set<plt::CookingZone>({plt::CookingZone_Trash, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
                     }
+                    else if (std::string("Plating") == layer_obj->name.ptr)
+                    {
+                        flecs::entity zone_e = ecs_world->entity();
+                        zone_e.set<plt::CookingZone>({plt::CookingZone_Plating, Rectangle{layer_obj->x, layer_obj->y, layer_obj->width, layer_obj->height}});
+                    }
 
                     layer_obj = layer_obj->next;
                 }
@@ -193,4 +203,9 @@ Map::~Map()
 void Map::draw()
 {
     DrawTextureRec(map_target.texture, Rectangle{0, 0, (float)map_target.texture.width, (float)-map_target.texture.height}, Vector2{0, 0}, WHITE);
+}
+
+void Map::drawFront()
+{
+    DrawTextureRec(map_target_front.texture, Rectangle{0, 0, (float)map_target.texture.width, (float)-map_target.texture.height}, Vector2{0, 0}, WHITE);
 }

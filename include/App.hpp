@@ -25,7 +25,16 @@ private:
     plt::GameState game_state;
     plt::GameState prev_game_state;
 
+    plt::Devil devil;
+
     // Customer Values
+    std::vector<plt::Customer> customers;
+
+    std::vector<std::string> Day1Dialogue;
+    std::vector<std::string> Day2Dialogue;
+    std::vector<std::string> Day3Dialogue;
+
+    void addRandomCustomers(int count, int order_size);
 
     // Fonts
     //--------------------------------------------------------------------------------------
@@ -38,11 +47,18 @@ private:
     // Player Texture
     Texture2D player_tex;
 
+    // Logo Texture
+    Texture2D logo_tex;
+
     // Food Texture
     Texture2D meals_tex;
-    //--------------------------------------------------------------------------------------
 
-    plt::Meal current_meal;
+    // Customer Texture
+    Texture2D customer_tex;
+    
+    // Devil Texture
+    Texture2D devil_tex;
+    //--------------------------------------------------------------------------------------
 
     // Audio
     //--------------------------------------------------------------------------------------
@@ -71,7 +87,26 @@ private:
     void renderDishMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
     void renderSinkMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
     void renderCuttingBoardMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
+    void renderStoveMenu(flecs::entity e, plt::Position &pos, plt::Player &player);
     void renderPlayerInventory(flecs::entity e, plt::Position &pos, plt::Player &player);
+
+    // Order Functions
+    void addDishToOrder(plt::Order &o, plt::Dish dish);
+    void addIngredientToOrder(plt::Order &o, plt::Ingredient ing);
+    plt::Order getRandomOrder(int number_of_sides);
+
+    void renderDevil(Rectangle target, Color color);
+    void renderIngredient(plt::Ingredient &ing, Rectangle target, Color color);
+    void renderDish(plt::Dish &dish, Rectangle target, Color color);
+
+    void renderIngredientInstr(plt::Ingredient &ing, Vector2 pt, bool done);
+    void renderDishInstr(plt::Dish &dish, Vector2 pt, bool done);
+    void renderOrderInstr(plt::Order &order);
+
+    bool areIngredientsEqual(plt::Ingredient &a, plt::Ingredient &b);
+    bool areDishesEqual(plt::Dish &a, plt::Dish &b);
+
+    bool isPlayerHoldingRightPiece(plt::Player &player, plt::Order &order);
 
     // ECS
     //--------------------------------------------------------------------------------------
